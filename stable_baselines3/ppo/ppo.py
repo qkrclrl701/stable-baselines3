@@ -146,6 +146,8 @@ class PPO(OnPolicyAlgorithm):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
+        beta = 1.5
+
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
@@ -175,6 +177,9 @@ class PPO(OnPolicyAlgorithm):
                 policy_loss_1 = advantages * ratio
                 policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
+
+                approx_kl_div = th.mean(rollout_data.old_log_prob - log_prob).detach().cpu().numpy()
+                policy_loss -= beta * approx_kl_div
 
                 # Logging
                 pg_losses.append(policy_loss.item())
@@ -211,13 +216,15 @@ class PPO(OnPolicyAlgorithm):
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
-                approx_kl_divs.append(th.mean(rollout_data.old_log_prob - log_prob).detach().cpu().numpy())
+                approx_kl_divs.append(approx_kl_div)
 
             all_kl_divs.append(np.mean(approx_kl_divs))
 
-            if self.target_kl is not None and np.mean(approx_kl_divs) > 1.5 * self.target_kl:
-                print(f"Early stopping at step {epoch} due to reaching max kl: {np.mean(approx_kl_divs):.2f}")
-                break
+            if self.target_kl is not None:
+                if approx_kl_div < self.target_kl / 1.5:
+                    beta /= 2
+                elif approx_kl_div > self.target_kl * 1.5:
+                    beta *= 2
 
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
