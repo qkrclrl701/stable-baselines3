@@ -146,7 +146,10 @@ class PPO(OnPolicyAlgorithm):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
-        beta = 1.5
+        if self.target_kl is not None:
+            beta = 1.5
+        else:
+            beta = 0
 
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
@@ -237,6 +240,7 @@ class PPO(OnPolicyAlgorithm):
         logger.record("train/clip_fraction", np.mean(clip_fractions))
         logger.record("train/loss", loss.item())
         logger.record("train/explained_variance", explained_var)
+        logger.record("train/beta", beta)
         if hasattr(self.policy, "log_std"):
             logger.record("train/std", th.exp(self.policy.log_std).mean().item())
 
