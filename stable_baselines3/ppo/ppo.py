@@ -179,7 +179,7 @@ class PPO(OnPolicyAlgorithm):
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
                 approx_kl_div = th.mean(rollout_data.old_log_prob - log_prob).detach().cpu().numpy()
-                policy_loss -= beta * approx_kl_div
+                policy_loss += beta * approx_kl_div
 
                 # Logging
                 pg_losses.append(policy_loss.item())
