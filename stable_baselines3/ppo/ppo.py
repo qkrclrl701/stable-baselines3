@@ -115,6 +115,10 @@ class PPO(OnPolicyAlgorithm):
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
         self.target_kl = target_kl
+        if target_kl is not None:
+            self.beta = 1.5
+        else:
+            self.beta = 0
 
         if _init_setup_model:
             self._setup_model()
@@ -146,11 +150,6 @@ class PPO(OnPolicyAlgorithm):
         pg_losses, value_losses = [], []
         clip_fractions = []
 
-        if self.target_kl is not None:
-            beta = 1.5
-        else:
-            beta = 0
-
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
@@ -181,8 +180,8 @@ class PPO(OnPolicyAlgorithm):
                 policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
-                approx_kl_div = th.mean(rollout_data.old_log_prob - log_prob).detach().cpu().numpy()
-                policy_loss += beta * approx_kl_div
+                approx_kl_div = th.mean(rollout_data.old_log_prob - log_prob)
+                policy_loss += self.beta * approx_kl_div
 
                 # Logging
                 pg_losses.append(policy_loss.item())
@@ -219,15 +218,15 @@ class PPO(OnPolicyAlgorithm):
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
-                approx_kl_divs.append(approx_kl_div)
+                approx_kl_divs.append(approx_kl_div.detach().cpu().numpy())
 
             all_kl_divs.append(np.mean(approx_kl_divs))
 
             if self.target_kl is not None:
                 if approx_kl_div < self.target_kl / 1.5:
-                    beta /= 2
+                    self.beta /= 2
                 elif approx_kl_div > self.target_kl * 1.5:
-                    beta *= 2
+                    self.beta *= 2
 
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
@@ -240,7 +239,7 @@ class PPO(OnPolicyAlgorithm):
         logger.record("train/clip_fraction", np.mean(clip_fractions))
         logger.record("train/loss", loss.item())
         logger.record("train/explained_variance", explained_var)
-        logger.record("train/beta", beta)
+        logger.record("train/beta", self.beta)
         if hasattr(self.policy, "log_std"):
             logger.record("train/std", th.exp(self.policy.log_std).mean().item())
 
