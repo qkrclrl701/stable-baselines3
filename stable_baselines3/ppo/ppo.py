@@ -86,6 +86,7 @@ class PPO(OnPolicyAlgorithm):
         verbose: int = 0,
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
+        beta: Optional[float] = None,
         _init_setup_model: bool = True,
     ):
 
@@ -115,8 +116,8 @@ class PPO(OnPolicyAlgorithm):
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
         self.target_kl = target_kl
-        if target_kl is not None:
-            self.beta = 1.5
+        if target_kl is not None and beta is not None:
+            self.beta = beta
         else:
             self.beta = 0
 
