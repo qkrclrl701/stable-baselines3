@@ -120,6 +120,8 @@ class PPO(OnPolicyAlgorithm):
         else:
             self.beta = 0
 
+        self.loss = []
+
         if _init_setup_model:
             self._setup_model()
 
@@ -211,6 +213,7 @@ class PPO(OnPolicyAlgorithm):
                 entropy_losses.append(entropy_loss.item())
 
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                self.loss.append(loss.detach().cpu().numpy())
 
                 # Optimization step
                 self.policy.optimizer.zero_grad()
