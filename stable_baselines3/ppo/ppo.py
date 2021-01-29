@@ -184,7 +184,6 @@ class PPO(OnPolicyAlgorithm):
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
                 approx_kl_div = th.mean(rollout_data.old_log_prob - log_prob)
-                policy_loss += self.beta * approx_kl_div
 
                 # Logging
                 pg_losses.append(policy_loss.item())
@@ -213,7 +212,7 @@ class PPO(OnPolicyAlgorithm):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss + self.beta * approx_kl_div
                 self.loss.append(loss.detach().cpu().numpy())
 
                 # Optimization step
